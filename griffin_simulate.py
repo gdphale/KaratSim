@@ -1,5 +1,6 @@
 from ksim_functions import *
 import copy
+import matplotlib.pyplot as plt
 
 
 # returns metrics from the day's simulation.
@@ -36,38 +37,49 @@ def simday_ops_hours(schedule, starting_ops_times, ops_hours, yesterday):
         # the priority of the current tasks that ops members are working on. Also, sort the list of ops members so
         # that we know what the minimum priority is for ops people on the next iteration
         active_tasks = update_priorities(active_tasks, ops_members)
-        #if slot > 150 and active_tasks.empty():
-        #    print('ye')
-    day = DayStats(finished_ops_members, ops_members, completed_tasks, active_tasks.queue)
+    day = Day(finished_ops_members, ops_members, completed_tasks, active_tasks.queue)
     return day
 
 
-def determine_stability(numbInterviews, numbEmails, ops_start, ops_hours):
-    max_task_queue = 15
-    ITERS = 20
+#
+def determine_stability(interviews, emails, ops_start, ops_hours):
+    max_task_queue = 100
+    ITERS = 50
     yesterdays_tasks = None
     differences = []
     for i in range(ITERS):
         ops_hours_c = copy.copy(ops_hours)
         ops_start_c = copy.copy(ops_start)
-        schedule = populate_day(numbInterviews, numbEmails)
+        schedule = populate_day(interviews, emails)
         day = simday_ops_hours(schedule, ops_start_c, ops_hours_c, yesterdays_tasks)
         yesterdays_tasks = day.tasks_left
         if len(yesterdays_tasks) > max_task_queue:
-            return 'Failure after ' + str(i) + ' days.'
+            return(differences)
+            #return 'Failure after ' + str(i) + ' days.'
         differences.append(len(yesterdays_tasks))
     return differences
 
 
-# there are 24 hours in a day, that's 48 30 min sections, and 288 5 minute sections
-def run_day(numbInterviews, numbEmails, ops_start, ops_hours):
-    schedule = populate_day(numbInterviews, numbEmails)
-    print(min_ops_hours(schedule))
-    print(min_ops_members(schedule))
-    day = simday_ops_hours(schedule, ops_start, ops_hours, None)
-    return day
+# This function simulates a day of operations, returning a map of relevant information. Takes in the number of
+# interviews and the number of emails that will occur within the day, as well as two arrays ops_start and ops_hours,
+# which define the starting slots where ops members will begin working in a day and the amount of hours that each
+# member will work. Indices of the arrays tell which ops member corresponds to which hour.
+def run_day(interviews, emails, ops_start, ops_hours):
+    info = {}
+    schedule = populate_day(interviews, emails)
+    info['Min Ops Hours'] = min_ops_hours(schedule)
+    info['Min Ops Members'] = min_ops_members(schedule)
+    info['Day'] = simday_ops_hours(schedule, ops_start, ops_hours, None)
+    info['Stats'] = get_stats_from_day(day)
+    return info
 
 
+# Takes in two arrays ops_start and ops_hours, which define the starting slots where ops members will begin working
+# in a day and the amount of hours that each member will work. Indices of the arrays tell which ops member
+# corresponds to which hour. Also takes in an initial_guess which tells how many interviews iteration will begin at.
+# This then simulates a day with the given initial guess of interviews, incrementing that guess until the ops team can
+# no longer handle the given number of interviews. This function assumes that we receive 1/6 the amount of emails as
+# interviews are occurring in a day. It then returns the amount of interviews that the team could not handle.
 def find_break_point(ops_start, ops_hours, initial_guess):
     ivs = initial_guess
     unbroken = True
@@ -81,13 +93,18 @@ def find_break_point(ops_start, ops_hours, initial_guess):
 
 def main():
     #print(timeslot_to_time(100))
-    ops_start = [18, 80, 125, 200]
-    ops_hours = [7, 7, 7, 5]
-    interviews = 52
-    initial_guess = 20
+    ops_start = [18, 80, 200]
+    ops_hours = [7, 7, 5]
+    interviews = 40
+    initial_guess = 15
     emails = 7
-    print(find_break_point(ops_start, ops_hours, initial_guess))
-
+    a = determine_stability(interviews, emails, ops_start, ops_hours)
+    print(len(a))
+    plt.style.use('fivethirtyeight')
+    plt.plot(a)
+    plt.plot([3,17,18,3,15,4,2,6,7,4])
+    plt.show()
+    print(a)
 
 
 main()

@@ -227,45 +227,12 @@ class OpsMember:
             self.task_prior = self.active_task.prior
 
 
-# helps us store information about what happened in a day
-class DayStats:
+# Used to store information about what has happened in one day's simulation.
+class Day:
     def __init__(self, finished_ops, working_ops, finished_tasks, tasks_left, ):
         self.finished_ops = finished_ops
         self.working_ops = working_ops
         self.finished_tasks = finished_tasks
         self.tasks_left = tasks_left
-
-
-# the stats from day object is initialized using one of the day objects and a boolean which tells whether or not it is
-# going to track an entire week
-class stats_from_days:
-
-    def __init__(self, day):
-        self.__init__(day, False)
-
-    # week is a boolean to see if this is a stat keeper for a week or for a single day
-    def __init__(self, day, week):
-        self.week = week
-        if week:
-            self.tasks_left_day_end = {'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': []}
-            self.finished_tasks_day_end = {'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': []}
-            self.ops_idle_time = {'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': []}
-            self.ops_number_tasks = {'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': []}
-            self.numb_days = 0
-        else:
-            self.tasks_left_day_end = []
-            self.finished_tasks_day_end = []
-            self.ops_idle_time = []
-            self.ops_number_tasks = []
-            self.numb_days = 0
-        self.add_day(day, 'Monday')
-
-    def add_day(self, day, week):
-        if self.week:
-            self.tasks_left_day_end[week].append(len(day.tasks_left))
-            self.finished_tasks_day_end[week].append(len(day.finished_tasks))
-            self.ops_idle_time[week].append([ops.idle_slots for ops in day.finished_ops])
-            self.ops_number_tasks[week].append([nt for nt in day.finished_ops])
-            self.numb_days = 0
 
 

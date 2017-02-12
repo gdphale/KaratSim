@@ -167,3 +167,16 @@ def min_ops_hours(schedule):
     return ops_slots * 5 / 60
 
 
+# Takes in a day object, and computes relevant statistics from that day. The statistics are: Average completion time of
+# tasks, idle times for all of the ops members, number of times ops members had to switch task.
+def get_stats_from_day(day):
+    stats = {}
+    stats['Idle Time'] = [idle for idle in day.finished_ops ]
+    stats['Switches'] = []
+    for member in day.finished_ops:
+        stats['Idle Time'].append(member.idle_slots) * SLOT_TIME / 60 # converts slots to hours
+        stats['Switches'].append(member.numb_switches)
+    for member in day.working_ops:
+        stats['Idle Time'].append(member.idle_slots) * SLOT_TIME / 60 # converts slots to hours
+        stats['Switches'].append(member.numb_switches)
+    return stats

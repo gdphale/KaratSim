@@ -1,0 +1,4 @@
+# system & vim stuff
+*.sw[pno]
+*.DS_Store
+
