@@ -1,128 +1,93 @@
-
-# these will all be made
-
-
-# ***************************** #
-# Amount of time tasks take     #     - eventually expand these into intervals. This will be implemented once we get the day to be simulated with static task-times
-# ***************************** #
-CREATION_TIME = 20
-SUP_TIME_NI = 5  # no issue
-SUP_TIME_I = 20  # issue
-SUP_KB_PROB = 0.063
-NO_SHOW_PERC = 0.02
-IV_ISSUE =
+from ksim_functions import *
+import copy
 
 
-# time penalty in minutes for switching a task in the middle of it
-# ------------------------------------------------------------------------------------
-SWITCH_TIME = 1
+# returns metrics from the day's simulation.
+# Total idle time of ops people.
+# Amount of ops people necessary.
+# Amount of ops people ideally.
+# Heat map of the day
+def simday_ops_hours(schedule, starting_ops_times, ops_hours, yesterday):
+    # queues for storing the day's tasks
+    active_tasks = Q.PriorityQueue()
+    if yesterday is not None:
+        for i in yesterday:
+            active_tasks.put(i)
+    completed_tasks = []
+
+    # lists of the ops members, and a list of when each ops person starts working
+    starting_ops_times.sort()
+    ops_members = []
+    finished_ops_members = []
+
+    # iterate through all 288 5 minute periods of a day
+    for slot in range(TOTAL_TIME_SLOTS):
+        # first we must take all the tasks that are starting now and add them to the active tasks
+        add_tasks(schedule, active_tasks, slot)
+        # second see if any ops people start working at this time
+        add_ops_from_list(ops_members, starting_ops_times, ops_hours, slot)
+        # now see which active tasks need to be completed, and which ops members need to switch tasks to account for different priorities
+        allocate_ops_tasks(active_tasks, ops_members)
+        # iterate through and have ops members perform their tasks, adding creation and publishing in the correct places, and removing completed tasks
+        perform_ops_tasks(ops_members, schedule, completed_tasks, slot)
+        # now check to see if any ops people need to be removed because they are over their time
+        ops_members = check_finished_ops(ops_members, active_tasks, finished_ops_members)
+        # now we must update the priority of all the tasks, as though 5 minutes have gone by. We also have to update
+        # the priority of the current tasks that ops members are working on. Also, sort the list of ops members so
+        # that we know what the minimum priority is for ops people on the next iteration
+        active_tasks = update_priorities(active_tasks, ops_members)
+        #if slot > 150 and active_tasks.empty():
+        #    print('ye')
+    day = DayStats(finished_ops_members, ops_members, completed_tasks, active_tasks.queue)
+    return day
 
 
-# ***************************** #
-# Priority Level of Tasks       #
-# ***************************** #
+def determine_stability(numbInterviews, numbEmails, ops_start, ops_hours):
+    max_task_queue = 15
+    ITERS = 20
+    yesterdays_tasks = None
+    differences = []
+    for i in range(ITERS):
+        ops_hours_c = copy.copy(ops_hours)
+        ops_start_c = copy.copy(ops_start)
+        schedule = populate_day(numbInterviews, numbEmails)
+        day = simday_ops_hours(schedule, ops_start_c, ops_hours_c, yesterdays_tasks)
+        yesterdays_tasks = day.tasks_left
+        if len(yesterdays_tasks) > max_task_queue:
+            return 'Failure after ' + str(i) + ' days.'
+        differences.append(len(yesterdays_tasks))
+    return differences
 
 
-# priority level that a support task starts out at - priority only grows
-# ------------------------------------------------------------------------------------#
-START_SUP_PRIOR = 95 # support
-START_CREATION_PRIOR = 60 # creation
-START_FINAL_PRIOR = 40 # final check
-START_EMAIL_PRIOR = 30 # answering a Zendesk ticket
+# there are 24 hours in a day, that's 48 30 min sections, and 288 5 minute sections
+def run_day(numbInterviews, numbEmails, ops_start, ops_hours):
+    schedule = populate_day(numbInterviews, numbEmails)
+    print(min_ops_hours(schedule))
+    print(min_ops_members(schedule))
+    day = simday_ops_hours(schedule, ops_start, ops_hours, None)
+    return day
 
 
-# Priority level growth rate of the different tasks. units/minute
-# ------------------------------------------------------------------------------------#
-SUP_PRIOR_GROWTH = 1 # this way it reaches 100 after 5 minutes, meaning the interview MUST be supported
-CREATION_PRIOR_GROWTH = 0.4 # MUST be created after 1.5 hours
-FINAL_PRIOR_GROWTH = 0.5 # higher growth rate than creation, only it starts further behind.
-EMAIL_PRIOR_GROWTH = 0.2
-
-
-
-
-
-
-
-
-
-
-# A somewhat Abstract class which encompasses all the tasks that support members must do. Things such as support, creation, etc. are all children of this class
-class Task:
-
-    # makes a new test of the type
-    def __init__(self, tasktype):
-        self.type = tasktype
-
-
-    def setStart(self, time):
-        self.start = time
-
-    def setEnd(self, time):
-        self.end = time
-
-    def printChildValues(self):
-        print(self.priority)
-
-
-
-
-# Defines a support task that an Ops support member must fulfill
-class Support(Task):
-
-    type = 'Support'
-
-    def __init__(self):
-        Task.__init__(self, type)
-        self.priority = START_SUP_PRIOR
-
-
-
-
-
-# Defines a creation task for an Ops member to do - these will be stores as lists during the day
-class Creation(Task):
-
-    type = 'Creation'
-
-    def __init__(self):
-        super.__init__(self.super, type)
-        self.priority = START_CREATION_PRIOR
-
-
-
-# Defines a Final Check and publishing task of an interview - these will be stored as lists during the day
-class Publishing(Task):
-    type = 'Publishing'
-
-    def __init__(self):
-        super.__init__(self.super, type)
-        self.priority = START_FINAL_PRIOR
-
-
-
-# Defines the task of answering a zendesk email.
-class Email(Task):
-    type = 'Email'
-
-    def __init__(self):
-        super.__init__(self.super, type)
-        self.priority = START_EMAIL_PRIOR
-
-
-
+def find_break_point(ops_start, ops_hours, initial_guess):
+    ivs = initial_guess
+    unbroken = True
+    while unbroken:
+        emails = M.floor(ivs / 6)
+        a = determine_stability(ivs, emails, ops_start, ops_hours)
+        if type(a) is not list:
+            return ivs - 1
+        ivs += 2
 
 
 def main():
-    t1 = Support()
-    t1.printChildValues()
-
-
-def RunDay(numbInterviews, numEmails, numbFailures):
-
-    # get the task distribution of theday
+    #print(timeslot_to_time(100))
+    ops_start = [18, 80, 125, 200]
+    ops_hours = [7, 7, 7, 5]
+    interviews = 52
+    initial_guess = 20
+    emails = 7
+    print(find_break_point(ops_start, ops_hours, initial_guess))
 
 
 
 main()
-
